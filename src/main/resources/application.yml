@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: user-data-api
+
+app:
+  csv:
+    file:
+      path: src/main/resources/financial_dummy_data.csv
+  external:
+    api:
+      url: http://localhost:8080/mock/api/xyz  # Now points to our mock API
+
+logging:
+  level:
+    com.example.userdataapi: DEBUG
+    root: INFO
