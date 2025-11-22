@@ -46,21 +46,40 @@ curl -X POST http://localhost:8080/api/v1/process-user-data \
 
 Project Structure
 src/main/java/com/example/userdataapi/ 
+
 ├── UserDataApiApplication.java          # Main application class 
-├── controller/ │   └── UserDataController.java          # REST API endpoints 
+
+├── controller/ │   
+
+└── UserDataController.java          # REST API endpoints 
+
 ├── dto/ 
+
 │   ├── UserRequestDto.java              # Request data structure 
+
 │   └── ExternalApiResponseDto.java      # Response data structure 
+
 ├── model/ 
+
+
 │   ├── UserCsvData.java                 # CSV data mapping 
+
 │   └── CombinedUserData.java           # Combined data model 
+
 ├── service/ │   ├── UserDataService.java            # Main business logic 
+
 │   ├── CsvReaderService.java           # CSV data processing 
+
 │   └── ExternalApiService.java         # External API integration 
+
 └── exception/     
+
 	├── GlobalExceptionHandler.java     # Error handling     
+	
 	├── UserNotFoundException.java      # Custom exceptions     
+	
 	├── CsvProcessingException.java     
+	
 	└── ExternalApiException.java
 
 Configuration
