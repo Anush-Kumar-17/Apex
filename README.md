@@ -40,9 +40,28 @@ Response
 {   "plans": [     {       "tenure": 3,       "apr": 0,       "monthly": 9333,       "reason": "Merchant subvention & stable profile"     },     {       "tenure": 6,       "apr": 6,       "monthly": 4830,       "reason": "Balanced plan"     }   ],   "ui_message": {     "headline": "Pay ₹9,333/mo",     "subcopy": "Pre-approved 3-month EMI for this purchase. Click to view plans."   },   "risk_explanation": "Low risk: stable address + high GMV; offered 0% for 3 months.",   "debug": {     "pincode_stability_score": 0.86,     "thin_file_flag": false,     "imputed_income": 52000   } }
 
 CURL Example
-curl -X POST http://localhost:8080/api/v1/process-user-data \   -H "Content-Type: application/json" \   -d '{     "user_id": "U001",     "cart_value": 27999,     "merchant_category": "mobile",     "merchant_subvention_no_cost_emi_flag": false,     "live_address_info": {       "pincode": 400080,       "address_change_months": 2     }   }'
+curl -X POST http://localhost:8080/api/v1/process-user-data \
+-H "Content-Type: application/json" \
+-d '{     "user_id": "U001",     "cart_value": 27999,     "merchant_category": "mobile",     "merchant_subvention_no_cost_emi_flag": false,     "live_address_info": {       "pincode": 400080,       "address_change_months": 2     }   }'
+
 Project Structure
-src/main/java/com/example/userdataapi/ ├── UserDataApiApplication.java          # Main application class ├── controller/ │   └── UserDataController.java          # REST API endpoints ├── dto/ │   ├── UserRequestDto.java              # Request data structure │   └── ExternalApiResponseDto.java      # Response data structure ├── model/ │   ├── UserCsvData.java                 # CSV data mapping │   └── CombinedUserData.java           # Combined data model ├── service/ │   ├── UserDataService.java            # Main business logic │   ├── CsvReaderService.java           # CSV data processing │   └── ExternalApiService.java         # External API integration └── exception/     ├── GlobalExceptionHandler.java     # Error handling     ├── UserNotFoundException.java      # Custom exceptions     ├── CsvProcessingException.java     └── ExternalApiException.java
+src/main/java/com/example/userdataapi/ 
+├── UserDataApiApplication.java          # Main application class 
+├── controller/ │   └── UserDataController.java          # REST API endpoints 
+├── dto/ 
+│   ├── UserRequestDto.java              # Request data structure 
+│   └── ExternalApiResponseDto.java      # Response data structure 
+├── model/ 
+│   ├── UserCsvData.java                 # CSV data mapping 
+│   └── CombinedUserData.java           # Combined data model 
+├── service/ │   ├── UserDataService.java            # Main business logic 
+│   ├── CsvReaderService.java           # CSV data processing 
+│   └── ExternalApiService.java         # External API integration 
+└── exception/     
+	├── GlobalExceptionHandler.java     # Error handling     
+	├── UserNotFoundException.java      # Custom exceptions     
+	├── CsvProcessingException.java     
+	└── ExternalApiException.java
 
 Configuration
 Environment Variables
