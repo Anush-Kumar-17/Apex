@@ -1,5 +1,6 @@
 package Apex.app.service;
 
+import Apex.app.dto.ExternalApiRequestDto;
 import Apex.app.dto.ExternalApiResponseDto;
 import Apex.app.dto.UserRequestDto;
 import Apex.app.model.CombinedUserData;
@@ -7,7 +8,6 @@ import Apex.app.model.UserCsvData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
 
 @Service
 public class UserDataService {
@@ -20,35 +20,43 @@ public class UserDataService {
 
     public ExternalApiResponseDto processUserData(UserRequestDto request) {
 
-        // 1. Find user data from CSV (throws UserNotFoundException if not found)
+        // 1. Find user data from CSV
         UserCsvData csvData = csvReaderService.findUserById(request.getUser_id());
 
-        // 2. Combine request data with CSV data
-        CombinedUserData combinedData = CombinedUserData.builder()
-                .userId(request.getUser_id())
-                .cartValue(request.getCart_value())
-                .merchantCategory(request.getMerchant_category())
-                .merchantSubventionNoCostEmiFlag(request.getMerchant_subvention_no_cost_emi_flag())
-                .liveAddressInfo(request.getLive_address_info())
-                .bureauScore(csvData.getBureauScore())
-                .bureauVintage(csvData.getBureauVintage())
-                .uniqueAccountsCount(csvData.getUniqueAccountsCount())
-                .activeAccountsCount(csvData.getActiveAccountsCount())
-                .loansCount(csvData.getLoansCount())
-                .unsecuredLoanCount(csvData.getUnsecuredLoanCount())
-                .ccActiveSumOfCB(csvData.getCcActiveSumOfCB())
-                .totalCreditCardLimit(csvData.getTotalCreditCardLimit())
-                .inquiryCountIn1M(csvData.getInquiryCountIn1M())
-                .imputedIncome(csvData.getImputedIncome())
-                .hasActiveExclusiveCreditCardAccount(csvData.getHasActiveExclusiveCreditCardAccount())
-                .avgMonthsBetweenAvailingNewTradeline(csvData.getAvgMonthsBetweenAvailingNewTradeline())
-                .maxSanctionedAmountOnAllLoans(csvData.getMaxSanctionedAmountOnAllLoans())
-                .maxOverdueAmountInActiveLoans(csvData.getMaxOverdueAmountInActiveLoans())
-                .ccMaxDPDIn12M(csvData.getCcMaxDPDIn12M())
-                .loansWrittenOffSettledCountsIn24M(csvData.getLoansWrittenOffSettledCountsIn24M())
-                .build();
+        // 2. Map to external API request format
+        ExternalApiRequestDto apiRequest = mapToExternalApiRequest(request, csvData);
 
-        // 3. Call external API (throws ExternalApiException on failure)
-        return externalApiService.callExternalApi(combinedData);
+        // 3. Call external API and return response directly
+        return externalApiService.callExternalApi(apiRequest);
+    }
+
+    private ExternalApiRequestDto mapToExternalApiRequest(UserRequestDto request, UserCsvData csvData) {
+        return ExternalApiRequestDto.builder()
+                .name(csvData.getName() != null ? csvData.getName() : "User")
+                .age(csvData.getAge() != null ? csvData.getAge() : 25)
+                .merchantCategory(request.getMerchant_category())
+                .merchant_name(request.getMerchant_name())
+                .merchant_sub_category(request.getMerchant_sub_category())
+                .imputedIncome(csvData.getImputedIncome())
+                .cartValue(request.getCart_value())
+                .bureauScore(csvData.getBureauScore())
+                .noOfPersonalLoans(csvData.getLoansCount() != null ? csvData.getLoansCount() : 0)
+                .pincodeStabilityMonths(request.getLive_address_info().getAddress_change_months())
+                .loanInquiryCountIn1M(csvData.getInquiryCountIn1M() != null ? csvData.getInquiryCountIn1M() : 0)
+                .thinFileFlag(csvData.getUniqueAccountsCount() != null && csvData.getUniqueAccountsCount() < 3 ? 1 : 0)
+                .NTC(calculateNTC(csvData))
+                .dpd_30_plus_last_6m(csvData.getDpd30PlusLast6m() != null ? csvData.getDpd30PlusLast6m() : 0)
+                .dpd_90_plus_last_36m(csvData.getDpd90PlusLast36m() != null ? csvData.getDpd90PlusLast36m() : 0)
+                .cardedFlag(csvData.getHasActiveExclusiveCreditCardAccount() != null && csvData.getHasActiveExclusiveCreditCardAccount() ? 1 : 0)
+                .gmv_6m_total(csvData.getGmv6mTotal() != null ? csvData.getGmv6mTotal() : 0.0)
+                .build();
+    }
+
+    private Integer calculateNTC(UserCsvData csvData) {
+        // NTC (New To Credit) - simplified logic
+        if (csvData.getBureauVintage() == null || csvData.getBureauVintage() < 12) {
+            return 1; // New to credit
+        }
+        return 0; // Experienced credit user
     }
 }

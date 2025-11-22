@@ -10,6 +10,12 @@ public class UserCsvData {
     @CsvBindByName(column = "user_id")
     private String userId;
 
+    @CsvBindByName(column = "name")
+    private String name;
+
+    @CsvBindByName(column = "age")
+    private Integer age;
+
     @CsvBindByName(column = "bureauScore")
     private Integer bureauScore;
 
@@ -57,4 +63,14 @@ public class UserCsvData {
 
     @CsvBindByName(column = "loansWrittenOffSettledCountsIn24M")
     private Integer loansWrittenOffSettledCountsIn24M;
+
+    // Additional fields for new API
+    @CsvBindByName(column = "gmv_6m_total")
+    private Double gmv6mTotal;
+
+    @CsvBindByName(column = "dpd_30_plus_last_6m")
+    private Integer dpd30PlusLast6m;
+
+    @CsvBindByName(column = "dpd_90_plus_last_36m")
+    private Integer dpd90PlusLast36m;
 }

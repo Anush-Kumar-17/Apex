@@ -114,17 +114,6 @@ public class GlobalExceptionHandler {
 
     private ExternalApiResponseDto createErrorResponse(String headline, String subcopy, String riskExplanation, boolean isThinFile) {
         return ExternalApiResponseDto.builder()
-                .plans(new ArrayList<>())  // Empty plans array
-                .ui_message(ExternalApiResponseDto.UiMessage.builder()
-                        .headline(headline)
-                        .subcopy(subcopy)
-                        .build())
-                .risk_explanation(riskExplanation)
-                .debug(ExternalApiResponseDto.Debug.builder()
-                        .pincode_stability_score(0.0)
-                        .thin_file_flag(isThinFile)
-                        .imputed_income(0)
-                        .build())
                 .build();
     }
 }

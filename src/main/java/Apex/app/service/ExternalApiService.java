@@ -1,5 +1,6 @@
 package Apex.app.service;
 
+import Apex.app.dto.ExternalApiRequestDto;
 import Apex.app.dto.ExternalApiResponseDto;
 import Apex.app.exception.ExternalApiException;
 import Apex.app.model.CombinedUserData;
@@ -31,13 +32,13 @@ public class ExternalApiService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public ExternalApiResponseDto callExternalApi(CombinedUserData combinedData) {
+    public ExternalApiResponseDto callExternalApi(ExternalApiRequestDto requestData) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Content-Type", "application/json");
             headers.set("Accept", "application/json");
 
-            String jsonBody = objectMapper.writeValueAsString(combinedData);
+            String jsonBody = objectMapper.writeValueAsString(requestData);
             HttpEntity<String> requestEntity = new HttpEntity<>(jsonBody, headers);
 
             ResponseEntity<ExternalApiResponseDto> response = restTemplate.exchange(
@@ -48,22 +49,22 @@ public class ExternalApiService {
             );
 
             if (response.getBody() == null) {
-                throw new ExternalApiException("Empty response from EMI calculation service");
+                throw new ExternalApiException("Empty response from loan calculation service");
             }
 
             return response.getBody();
 
         } catch (HttpClientErrorException e) {
-            throw new ExternalApiException("Invalid request to EMI service: " + e.getMessage());
+            throw new ExternalApiException("Invalid request to loan service: " + e.getMessage());
         } catch (HttpServerErrorException e) {
-            throw new ExternalApiException("EMI calculation service is temporarily down: " + e.getMessage());
+            throw new ExternalApiException("Loan calculation service is temporarily down: " + e.getMessage());
         } catch (ResourceAccessException e) {
             if (e.getCause() instanceof SocketTimeoutException) {
-                throw new ExternalApiException("EMI calculation service timed out. Please try again.");
+                throw new ExternalApiException("Loan calculation service timed out. Please try again.");
             }
-            throw new ExternalApiException("Unable to reach EMI calculation service: " + e.getMessage());
+            throw new ExternalApiException("Unable to reach loan calculation service: " + e.getMessage());
         } catch (Exception e) {
-            throw new ExternalApiException("Unexpected error calling EMI service: " + e.getMessage(), e);
+            throw new ExternalApiException("Unexpected error calling loan service: " + e.getMessage(), e);
         }
     }
 }

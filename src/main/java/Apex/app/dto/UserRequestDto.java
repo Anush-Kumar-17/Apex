@@ -17,6 +17,12 @@ public class UserRequestDto {
     @NotBlank(message = "Merchant category is required")
     private String merchant_category;
 
+    @NotBlank(message = "Merchant name is required")
+    private String merchant_name;
+
+    @NotBlank(message = "Merchant sub category is required")
+    private String merchant_sub_category;
+
     @NotNull(message = "Merchant subvention flag is required")
     private Boolean merchant_subvention_no_cost_emi_flag;
 

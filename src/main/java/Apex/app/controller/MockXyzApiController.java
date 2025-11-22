@@ -1,152 +1,193 @@
 package Apex.app.controller;
 
+import Apex.app.dto.ExternalApiRequestDto;
 import Apex.app.dto.ExternalApiResponseDto;
 import Apex.app.model.CombinedUserData;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+
 @RestController
 @RequestMapping("/mock/api")
 public class MockXyzApiController {
 
     @PostMapping("/xyz")
-    public ResponseEntity<ExternalApiResponseDto> mockXyzApi(@RequestBody CombinedUserData request) {
+    public ResponseEntity<ExternalApiResponseDto> mockXyzApi(@RequestBody ExternalApiRequestDto request) {
 
-        // Create EMI plans based on bureau score and cart value
-        List<ExternalApiResponseDto.Plan> plans = createEmiPlans(request);
+        // Calculate loan eligibility based on bureau score and other factors
+        String eligibility = calculateEligibility(request);
+        String riskCategory = calculateRiskCategory(request);
+        String segmentColor = calculateSegmentColor(riskCategory);
+        String userType = request.getCardedFlag() == 1 ? "Carded" : "Non-Carded";
 
-        // Create UI message based on the best plan
-        ExternalApiResponseDto.UiMessage uiMessage = createUiMessage(plans.get(0), request.getCartValue());
+        // Calculate assigned limit
+        Double numericLimit = calculateAssignedLimit(request);
+        String formattedLimit = formatCurrency(numericLimit);
 
-        // Create risk explanation based on bureau score
-        String riskExplanation = createRiskExplanation(request);
+        // Generate EMI options
+        List<ExternalApiResponseDto.EmiOption> emiOptions = generateEmiOptions(request, eligibility);
 
-        // Create debug information
-        ExternalApiResponseDto.Debug debug = ExternalApiResponseDto.Debug.builder()
-                .pincode_stability_score(calculatePincodeStability(request))
-                .thin_file_flag(request.getUniqueAccountsCount() != null && request.getUniqueAccountsCount() < 3)
-                .imputed_income(request.getImputedIncome() != null ? request.getImputedIncome().intValue() : 50000)
-                .build();
+        // Calculate confidence
+        Integer confidence = calculateConfidence(request);
 
-        // Build complete response
+        // Determine if downpayment required
+        Boolean downpaymentRequired = request.getBureauScore() < 600 || request.getCartValue() > numericLimit;
+
+        // Generate merchant plan output
+        String merchantPlan = generateMerchantPlan(eligibility, downpaymentRequired);
+
         ExternalApiResponseDto response = ExternalApiResponseDto.builder()
-                .plans(plans)
-                .ui_message(uiMessage)
-                .risk_explanation(riskExplanation)
-                .debug(debug)
+                .name(request.getName())
+                .merchant_name(request.getMerchant_name())
+                .merchant_sub_category(request.getMerchant_sub_category())
+                .loanEligibility(eligibility)
+                .dpd_check(ExternalApiResponseDto.DpdCheck.builder()
+                        .dpd_30_plus_last_6m(request.getDpd_30_plus_last_6m())
+                        .dpd_90_plus_last_36m(request.getDpd_90_plus_last_36m())
+                        .build())
+                .riskCategory(riskCategory)
+                .segmentColor(segmentColor)
+                .merchantCategory(request.getMerchantCategory())
+                .merchantPlanOutput(merchantPlan)
+                .widgetHeadline("")
+                .user_type(userType)
+                .cart_ratio(request.getCartValue() / request.getImputedIncome())
+                .gmv_monthly(request.getGmv_6m_total() / 6.0)
+                .expense_percent(0.0)
+                .affluence_score(calculateAffluenceScore(request))
+                .numeric_assigned_limit(numericLimit)
+                .assignedLimit(formattedLimit)
+                .downpaymentRequired(downpaymentRequired)
+                .emiOptions(emiOptions)
+                .personalisedLoanSuggestion(merchantPlan)
+                .confidence(confidence)
+                .debug(ExternalApiResponseDto.Debug.builder()
+                        .modifier_sum(calculateModifierSum(request))
+                        .applied_adjustments(generateAdjustments(request))
+                        .shortfall_ratio(0.0)
+                        .principal_amount(request.getCartValue())
+                        .reasoning("Deterministic rules applied with modifiers and ML override.")
+                        .build())
                 .build();
 
         return ResponseEntity.ok(response);
     }
 
-    private List<ExternalApiResponseDto.Plan> createEmiPlans(CombinedUserData request) {
-        List<ExternalApiResponseDto.Plan> plans = new ArrayList<>();
-        Long cartValue = request.getCartValue();
-        Integer bureauScore = request.getBureauScore();
-        Boolean merchantSubvention = request.getMerchantSubventionNoCostEmiFlag();
+    private String calculateEligibility(ExternalApiRequestDto request) {
+        if (request.getBureauScore() < 300) return "Not Eligible";
+        if (request.getDpd_90_plus_last_36m() > 2) return "Not Eligible";
+        return "Eligible";
+    }
 
-        if (bureauScore != null && bureauScore > 650) {
-            // High credit score - offer good plans
-            if (Boolean.TRUE.equals(merchantSubvention)) {
-                // 0% plan for merchant subvention
-                plans.add(ExternalApiResponseDto.Plan.builder()
-                        .tenure(3)
-                        .apr(0.0)
-                        .monthly((int) Math.ceil(cartValue / 3.0))
-                        .reason("Merchant subvention & stable profile")
+    private String calculateRiskCategory(ExternalApiRequestDto request) {
+        if (request.getBureauScore() >= 700) return "Low_Risk";
+        if (request.getBureauScore() >= 500) return "Medium_Risk";
+        return "High_Risk";
+    }
+
+    private String calculateSegmentColor(String riskCategory) {
+        switch (riskCategory) {
+            case "Low_Risk": return "Green";
+            case "Medium_Risk": return "Orange";
+            case "High_Risk": return "Red";
+            default: return "Red";
+        }
+    }
+
+    private Double calculateAssignedLimit(ExternalApiRequestDto request) {
+        double baseLimit = request.getImputedIncome() * 0.1; // 10% of income
+
+        // Adjust based on bureau score
+        if (request.getBureauScore() >= 700) baseLimit *= 1.5;
+        else if (request.getBureauScore() >= 500) baseLimit *= 1.0;
+        else baseLimit *= 0.5;
+
+        return Math.max(baseLimit, 10000.0); // Minimum 10k
+    }
+
+    private Integer calculateAffluenceScore(ExternalApiRequestDto request) {
+        int score = 0;
+        if (request.getImputedIncome() > 100000) score += 30;
+        else if (request.getImputedIncome() > 50000) score += 20;
+        else score += 10;
+
+        if (request.getBureauScore() >= 700) score += 20;
+        else if (request.getBureauScore() >= 500) score += 10;
+
+        return Math.min(score, 100);
+    }
+
+    private List<ExternalApiResponseDto.EmiOption> generateEmiOptions(ExternalApiRequestDto request, String eligibility) {
+        List<ExternalApiResponseDto.EmiOption> options = new ArrayList<>();
+
+        if ("Eligible".equals(eligibility)) {
+            boolean requiresDP = request.getBureauScore() < 600;
+
+            // Pay-in-3 option
+            options.add(ExternalApiResponseDto.EmiOption.builder()
+                    .tenure("Pay-in-3")
+                    .type("Pay-in-3")
+                    .apr("0")
+                    .montly((int) Math.ceil(request.getCartValue() / 3.0))
+                    .downpaymentRequired(requiresDP)
+                    .build());
+
+            // 6-month option for good scores
+            if (request.getBureauScore() >= 500) {
+                options.add(ExternalApiResponseDto.EmiOption.builder()
+                        .tenure("6")
+                        .type("Standard")
+                        .apr("12")
+                        .montly((int) Math.ceil(request.getCartValue() * 1.12 / 6.0))
+                        .downpaymentRequired(false)
                         .build());
             }
-
-            // Standard plans
-            plans.add(ExternalApiResponseDto.Plan.builder()
-                    .tenure(6)
-                    .apr(6.0)
-                    .monthly((int) Math.ceil(cartValue * 1.06 / 6.0))
-                    .reason("Balanced plan")
-                    .build());
-
-            plans.add(ExternalApiResponseDto.Plan.builder()
-                    .tenure(9)
-                    .apr(10.0)
-                    .monthly((int) Math.ceil(cartValue * 1.10 / 9.0))
-                    .reason("Longer tenor for stable customers")
-                    .build());
-
-        } else if (bureauScore != null && bureauScore > 500) {
-            // Medium credit score - limited plans
-            plans.add(ExternalApiResponseDto.Plan.builder()
-                    .tenure(3)
-                    .apr(12.0)
-                    .monthly((int) Math.ceil(cartValue * 1.12 / 3.0))
-                    .reason("Short tenor plan")
-                    .build());
-
-            plans.add(ExternalApiResponseDto.Plan.builder()
-                    .tenure(6)
-                    .apr(15.0)
-                    .monthly((int) Math.ceil(cartValue * 1.15 / 6.0))
-                    .reason("Standard plan")
-                    .build());
-
-        } else {
-            // Low credit score - high interest
-            plans.add(ExternalApiResponseDto.Plan.builder()
-                    .tenure(3)
-                    .apr(18.0)
-                    .monthly((int) Math.ceil(cartValue * 1.18 / 3.0))
-                    .reason("High risk - short tenor only")
-                    .build());
         }
 
-        return plans;
+        return options;
     }
 
-    private ExternalApiResponseDto.UiMessage createUiMessage(ExternalApiResponseDto.Plan bestPlan, Long cartValue) {
-        String headline = String.format("Pay ₹%,d/mo", bestPlan.getMonthly());
-        String subcopy;
-
-        if (bestPlan.getApr() == 0) {
-            subcopy = String.format("Pre-approved %d-month 0%% EMI for this purchase. Click to view plans.", bestPlan.getTenure());
-        } else {
-            subcopy = String.format("Pre-approved %d-month EMI for this purchase. Click to view plans.", bestPlan.getTenure());
-        }
-
-        return ExternalApiResponseDto.UiMessage.builder()
-                .headline(headline)
-                .subcopy(subcopy)
-                .build();
+    private String generateMerchantPlan(String eligibility, Boolean downpaymentRequired) {
+        if (!"Eligible".equals(eligibility)) return "decline";
+        if (downpaymentRequired) return "Pay-in-3 with DP OR decline";
+        return "Pay-in-3 OR Standard EMI";
     }
 
-    private String createRiskExplanation(CombinedUserData request) {
-        Integer bureauScore = request.getBureauScore();
-        Integer addressChangeMonths = request.getLiveAddressInfo().getAddress_change_months();
+    private Integer calculateConfidence(ExternalApiRequestDto request) {
+        int confidence = 50; // Base confidence
 
-        if (bureauScore != null && bureauScore > 700) {
-            if (addressChangeMonths != null && addressChangeMonths > 6) {
-                return "Low risk: stable address + high credit score; offered premium rates.";
-            } else {
-                return "Low risk: high credit score; offered good rates despite recent address change.";
-            }
-        } else if (bureauScore != null && bureauScore > 500) {
-            return "Medium risk: acceptable credit score; standard rates offered.";
-        } else {
-            return "High risk: low credit score; limited plans with higher rates.";
-        }
+        if (request.getBureauScore() >= 700) confidence += 30;
+        else if (request.getBureauScore() >= 500) confidence += 10;
+        else confidence -= 20;
+
+        if (request.getDpd_90_plus_last_36m() == 0) confidence += 10;
+        if (request.getPincodeStabilityMonths() >= 12) confidence += 5;
+
+        return Math.max(Math.min(confidence, 100), 0);
     }
 
-    private Double calculatePincodeStability(CombinedUserData request) {
-        // Mock calculation based on address change months
-        Integer addressChangeMonths = request.getLiveAddressInfo().getAddress_change_months();
-        if (addressChangeMonths == null) return 0.5;
+    private Integer calculateModifierSum(ExternalApiRequestDto request) {
+        int sum = 0;
+        if (request.getNTC() == 1) sum -= 1;
+        if (calculateAffluenceScore(request) < 30) sum -= 1;
+        return sum;
+    }
 
-        // More stable if address hasn't changed for longer
-        if (addressChangeMonths > 12) return 0.95;
-        if (addressChangeMonths > 6) return 0.86;
-        if (addressChangeMonths > 3) return 0.72;
-        return 0.45;
+    private String generateAdjustments(ExternalApiRequestDto request) {
+        List<String> adjustments = new ArrayList<>();
+        if (request.getNTC() == 1) adjustments.add("NTC -1");
+        if (calculateAffluenceScore(request) < 30) adjustments.add("affluence -1");
+        return String.join(", ", adjustments);
+    }
+
+    private String formatCurrency(Double amount) {
+        NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
+        return formatter.format(amount).replace("₹", "₹");
     }
 }
